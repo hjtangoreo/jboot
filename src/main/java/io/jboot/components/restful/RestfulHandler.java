@@ -19,9 +19,10 @@ public class RestfulHandler extends JbootActionHandler {
 
     @Override
     public Action getAction(String target, String[] urlPara, HttpServletRequest request) {
-        Action action = super.getAction(target, urlPara);
+        //优先从restful action 获取请求，防止url被当成urlPara处理
+        Action action = JbootRestfulManager.me().getRestfulAction(target, request.getMethod());
         if (action == null) {
-            action = JbootRestfulManager.me().getRestfulAction(target, request.getMethod());
+            action = super.getAction(target, urlPara);
         }
         return action;
     }
@@ -54,4 +55,5 @@ public class RestfulHandler extends JbootActionHandler {
             });
         }
     }
+
 }
