@@ -36,6 +36,9 @@ import io.jboot.app.config.support.nacos.NacosConfigManager;
 import io.jboot.components.gateway.JbootGatewayHandler;
 import io.jboot.components.gateway.JbootGatewayManager;
 import io.jboot.components.limiter.LimiterManager;
+import io.jboot.components.restful.JbootRestfulManager;
+import io.jboot.components.restful.RestfulHandler;
+import io.jboot.components.restful.annotation.RestController;
 import io.jboot.components.rpc.JbootrpcManager;
 import io.jboot.components.schedule.JbootScheduleManager;
 import io.jboot.core.listener.JbootAppListenerManager;
@@ -73,7 +76,9 @@ import java.util.Properties;
 public class JbootCoreConfig extends JFinalConfig {
 
     private List<Routes.Route> routeList = new ArrayList<>();
+    private List<Routes.Route> restfulRoutes = new ArrayList<>();
 
+    private JbootRestfulManager.Config restfulConfig = new JbootRestfulManager.Config();
 
     public JbootCoreConfig() {
 
@@ -173,6 +178,13 @@ public class JbootCoreConfig extends JFinalConfig {
                     continue;
                 }
 
+                //检查是否是restful类型的controller，如果是则加入restful专门指定的routes
+                RestController restController = clazz.getAnnotation(RestController.class);
+                if (restController != null) {
+                    restfulRoutes.add(new Routes.Route(value, clazz, value));
+                    continue;
+                }
+
                 String viewPath = AnnotationUtil.get(mapping.viewPath());
 
                 if (StrUtil.isNotBlank(viewPath)) {
@@ -192,6 +204,18 @@ public class JbootCoreConfig extends JFinalConfig {
 
         for (Routes.Route route : routes.getRouteItemList()) {
             JbootControllerManager.me().setMapping(route.getControllerKey(), route.getControllerClass());
+        }
+
+        if (!restfulRoutes.isEmpty()) {
+            //处理restful专属的routes
+            restfulConfig.setRoutes(restfulRoutes)
+                    .setBaseViewPath(routes.getBaseViewPath())
+                    .setMappingSupperClass(routes.getMappingSuperClass())
+                    .setRouteInterceptors(routes.getInterceptors());
+            restfulRoutes.forEach((Routes.Route route) -> {
+                JbootControllerManager.me().setMapping(route.getControllerKey(), route.getControllerClass());
+            });
+            routeList.addAll(restfulRoutes);
         }
 
         routeList.addAll(routes.getRouteItemList());
@@ -271,7 +295,11 @@ public class JbootCoreConfig extends JFinalConfig {
 
         //若用户自己没配置 ActionHandler，默认使用 JbootActionHandler
         if (handlers.getActionHandler() == null) {
-            handlers.setActionHandler(new JbootActionHandler());
+            if (!restfulRoutes.isEmpty()) {
+                handlers.setActionHandler(new RestfulHandler());
+            } else {
+                handlers.setActionHandler(new JbootActionHandler());
+            }
         }
 
     }
@@ -294,6 +322,7 @@ public class JbootCoreConfig extends JFinalConfig {
         JbootSeataManager.me().init();
         SentinelManager.me().init();
         JbootGatewayManager.me().init();
+        JbootRestfulManager.me().init(restfulConfig);
 
         JbootAppListenerManager.me().onStart();
     }
