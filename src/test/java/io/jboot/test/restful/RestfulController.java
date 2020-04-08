@@ -7,15 +7,18 @@ import com.jfinal.aop.Invocation;
 import com.jfinal.core.NotAction;
 import com.jfinal.kit.JsonKit;
 import com.jfinal.kit.StrKit;
-import io.jboot.components.restful.HttpStatus;
-import io.jboot.components.restful.ResponseEntity;
 import io.jboot.components.restful.annotation.*;
+import io.jboot.web.HttpStatus;
+import io.jboot.web.ResponseEntity;
 import io.jboot.web.controller.JbootController;
 import io.jboot.web.controller.annotation.RequestMapping;
 import io.jboot.web.cors.EnableCORS;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 @RestController
@@ -84,8 +87,10 @@ public class RestfulController extends JbootController {
 
     // GET /restful/users
     @GetMapping("/users")
-    public ResponseEntity<List<Data>> entityUsers(){
-        return new ResponseEntity<>(initData()).addHeader("x-token", StrKit.getRandomUUID()).setHttpStatus(HttpStatus.ACCEPTED);
+    public ResponseEntity entityUsers(){
+        return new ResponseEntity(initData())
+                .header("x-token", StrKit.getRandomUUID())
+                .status(HttpStatus.ACCEPTED);
     }
 
     // PUT /restful
@@ -113,5 +118,23 @@ public class RestfulController extends JbootController {
         System.out.println("delete by name : " + name);
         System.out.println("get token header : " + token);
     }
-    
+
+    @GetMapping("/get-date")
+    public Date getDate(){
+        return new Date();
+    }
+
+    @PutMapping("/input-date")
+    public void inputDate(@RequestParam @DateFormat Date date){
+        System.out.println("input date:" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date));
+        renderNull();
+    }
+
+    @PutMapping("/input-big-decimal")
+    public void inputBigDecimal(@RequestParam BigDecimal num){
+        System.out.println("input bigDecimal:"+num.toString());
+        renderNull();
+    }
+
+
 }

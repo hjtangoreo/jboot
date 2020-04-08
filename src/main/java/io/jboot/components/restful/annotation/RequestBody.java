@@ -5,13 +5,16 @@ import java.lang.annotation.*;
 /**
  * 请求体参数注解
  * 支持如下类型参数：
- *  string / string[]
- *  int / int[]
- *  double / double[]
- *  float / float[]
- *  boolean / boolean[]
- *  long / long[]
- *  object / object[]
+ *  string
+ *  int
+ *  double
+ *  float
+ *  boolean
+ *  long
+ *  object
+ *  bigDecimal
+ *  date
+ *  short
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)

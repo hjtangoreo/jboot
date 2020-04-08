@@ -6,7 +6,7 @@
 
     <groupId>io.jboot</groupId>
     <artifactId>jboot</artifactId>
-    <version>3.1.5-SNAPSHOT</version>
+    <version>3.1.6-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>jboot</name>
@@ -59,17 +59,17 @@
         <jsoup.version>1.13.1</jsoup.version>
         <ehcache.version>2.10.6</ehcache.version>
         <caffeine.version>2.8.1</caffeine.version>
-        <commons-lang3.version>3.9</commons-lang3.version>
+        <commons-lang3.version>3.10</commons-lang3.version>
         <commons-io.version>2.6</commons-io.version>
         <commons-codec.version>1.14</commons-codec.version>
         <httpclient.version>4.5.12</httpclient.version>
         <httpcore.version>4.4.13</httpcore.version>
         <netty.version>4.1.48.Final</netty.version>
         <sentinel.version>1.7.1</sentinel.version>
-        <dubbo.version>2.7.5</dubbo.version>
+        <dubbo.version>2.7.6</dubbo.version>
         <resteasy.version>3.11.0.Final</resteasy.version>
         <seata.version>1.1.0</seata.version>
-        <motan.version>1.1.7</motan.version>
+        <motan.version>1.1.8</motan.version>
         <metrics.version>4.1.5</metrics.version>
 
         <jdk.version>1.8</jdk.version>
@@ -275,7 +275,7 @@
         <dependency>
             <groupId>com.alibaba.nacos</groupId>
             <artifactId>nacos-client</artifactId>
-            <version>1.2.0</version>
+            <version>1.2.1</version>
             <scope>provided</scope>
         </dependency>
 

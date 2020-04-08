@@ -12,6 +12,9 @@ import java.lang.annotation.*;
  *  float
  *  boolean
  *  long
+ *  bigDecimal
+ *  date
+ *  short
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)

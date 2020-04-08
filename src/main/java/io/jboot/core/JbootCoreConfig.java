@@ -80,7 +80,6 @@ public class JbootCoreConfig extends JFinalConfig {
 
     private JbootRestfulManager.Config restfulConfig = new JbootRestfulManager.Config();
 
-
     public JbootCoreConfig() {
 
         initSystemProperties();
@@ -213,9 +212,9 @@ public class JbootCoreConfig extends JFinalConfig {
                     .setBaseViewPath(routes.getBaseViewPath())
                     .setMappingSupperClass(routes.getMappingSuperClass())
                     .setRouteInterceptors(routes.getInterceptors());
-            for (Routes.Route route : restfulRoutes) {
+            restfulRoutes.forEach((Routes.Route route) -> {
                 JbootControllerManager.me().setMapping(route.getControllerKey(), route.getControllerClass());
-            }
+            });
             routeList.addAll(restfulRoutes);
         }
 
@@ -293,11 +292,10 @@ public class JbootCoreConfig extends JFinalConfig {
         handlers.add(new JbootGatewayHandler());
         handlers.add(new JbootFilterHandler());
         handlers.add(new JbootHandler());
-//        handlers.setActionHandler(new RestfulHandler());
 
         //若用户自己没配置 ActionHandler，默认使用 JbootActionHandler
         if (handlers.getActionHandler() == null) {
-            if (restfulRoutes.isEmpty()) {
+            if (!restfulRoutes.isEmpty()) {
                 handlers.setActionHandler(new RestfulHandler());
             } else {
                 handlers.setActionHandler(new JbootActionHandler());
@@ -325,7 +323,6 @@ public class JbootCoreConfig extends JFinalConfig {
         SentinelManager.me().init();
         JbootGatewayManager.me().init();
         JbootRestfulManager.me().init(restfulConfig);
-
 
         JbootAppListenerManager.me().onStart();
     }

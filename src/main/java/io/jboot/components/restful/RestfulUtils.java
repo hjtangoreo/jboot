@@ -1,22 +1,27 @@
 package io.jboot.components.restful;
 
 
+import com.jfinal.core.ActionException;
 import com.jfinal.kit.JsonKit;
-import io.jboot.components.restful.annotation.PathVariable;
-import io.jboot.components.restful.annotation.RequestBody;
-import io.jboot.components.restful.annotation.RequestHeader;
-import io.jboot.components.restful.annotation.RequestParam;
-import io.jboot.components.restful.exception.ParameterNullErrorException;
-import io.jboot.components.restful.exception.ParameterParseErrorException;
+import com.jfinal.render.RenderManager;
+import io.jboot.components.restful.annotation.*;
 import io.jboot.utils.StrUtil;
+import io.jboot.web.HttpStatus;
 
 import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TimeZone;
 
 public class RestfulUtils {
+
+    private static final RenderManager renderManager = RenderManager.me();
 
     /**
      * 从url中解析路径参数
@@ -52,11 +57,10 @@ public class RestfulUtils {
      * @param request
      * @param rawData
      * @return
-     * @throws ParameterNullErrorException
-     * @throws ParameterParseErrorException
+     * @throws ActionException
      */
     public static Object[] parseActionMethodParameters(String target, String actionKey, Method actionMethod, HttpServletRequest request, String rawData)
-            throws ParameterNullErrorException, ParameterParseErrorException {
+            throws ActionException {
         Object[] args = new Object[actionMethod.getParameters().length];
         for (int i = 0; i < actionMethod.getParameters().length; i++) {
             Parameter parameter = actionMethod.getParameters()[i];
@@ -72,28 +76,28 @@ public class RestfulUtils {
                 }
                 values = request.getParameterValues(parameterName);
                 parameter.getType();
-                args[i] = parseRequestParamToParameter(values, parameterName, parameter.getType());
+                args[i] = parseRequestParamToParameter(values, parameterName, parameter.getType(), parameter);
                 if (args[i] == null && requestParam.required()) {
-                    //要求参数为空，但是却并没有提供参数
-                    throw new ParameterNullErrorException(parameterName);
+                    //要求参数不为空，但是却并没有提供参数
+                    throw genBindError("Parameter '" + parameterName + "' specifies a forced check, but the value is null");
                 }
             } else if (requestBody != null) {
-                args[i] = parseRequestBodyToParameter(rawData, parameterName, parameter.getType());
+                args[i] = parseRequestBodyToParameter(rawData, parameterName, parameter.getType(), parameter);
             } else if (requestHeader != null) {
                 if (StrUtil.isNotBlank(requestHeader.value())) {
                     parameterName = requestHeader.value();
                 }
                 String value = request.getHeader(parameterName);
-                args[i] = parseRequestHeaderToParameter(value, parameterName, parameter.getType());
+                args[i] = parseRequestHeaderToParameter(value, parameterName, parameter.getType(), parameter);
                 if (args[i] == null && requestHeader.required()) {
-                    //要求参数为空，但是却并没有提供参数
-                    throw new ParameterNullErrorException(parameterName);
+                    //要求参数不为空，但是却并没有提供参数
+                    throw genBindError("Parameter '" + parameterName + "' specifies a forced check, but the value is null");
                 }
             } else if (pathVariable != null) {
                 if (StrUtil.isNotBlank(pathVariable.value())) {
                     parameterName = pathVariable.value();
                 }
-                args[i] = parsePathVariableToParameter(target, actionKey, parameterName, parameter.getType());
+                args[i] = parsePathVariableToParameter(target, actionKey, parameterName, parameter.getType(), parameter);
             } else {
                 args[i] = null;
             }
@@ -119,83 +123,107 @@ public class RestfulUtils {
         return matchingCount == sourcePaths.length;
     }
 
-    private static Object parseRequestParamToParameter(String[] value, String name, Class<?> parameterTypeClass) {
-        if(parameterTypeClass.isArray()){
-            Object [] objects = new Object[value.length];
+    private static Object parseRequestParamToParameter(String[] value, String name, Class<?> parameterTypeClass, Parameter parameter) {
+        if (parameterTypeClass.isArray()) {
+            Object[] objects = new Object[value.length];
             for (int i = 0; i < value.length; i++) {
-                objects[i] = parseCommonValue(value[i], name, parameterTypeClass);
+                objects[i] = parseCommonValue(value[i], name, parameterTypeClass, parameter);
             }
             return objects;
         } else {
-            if(value != null && value.length > 0){
-                return parseCommonValue(value[0], name, parameterTypeClass);
+            if (value != null && value.length > 0) {
+                return parseCommonValue(value[0], name, parameterTypeClass, parameter);
             }
         }
 
         return null;
     }
 
-    private static Object parseRequestHeaderToParameter(String header, String name, Class<?> parameterTypeClass) {
-        return parseCommonValue(header, name, parameterTypeClass);
+    private static Object parseRequestHeaderToParameter(String header, String name, Class<?> parameterTypeClass, Parameter parameter) {
+        return parseCommonValue(header, name, parameterTypeClass, parameter);
     }
 
-    private static Object parseRequestBodyToParameter(String body, String name, Class<?> parameterTypeClass) {
+    private static Object parseRequestBodyToParameter(String body, String name, Class<?> parameterTypeClass, Parameter parameter) {
         //先当作基本数据来转换
-        Object value = parseCommonValue(body, name, parameterTypeClass);
-        if(value == null){
+        Object value = parseCommonValue(body, name, parameterTypeClass, parameter);
+        if (value == null) {
             value = JsonKit.parse(body, parameterTypeClass);
         }
         return value;
     }
 
-    private static Object parsePathVariableToParameter(String target, String actionKey, String parameterName, Class<?> parameterTypeClass) {
+    private static Object parsePathVariableToParameter(String target, String actionKey, String parameterName, Class<?> parameterTypeClass, Parameter parameter) {
         Map<String, String> pathVariables = parsePathVariables(target, actionKey);
         String value = pathVariables.get(parameterName);
-        return parseCommonValue(value, parameterName, parameterTypeClass);
+        return parseCommonValue(value, parameterName, parameterTypeClass, parameter);
     }
 
     /**
      * 转换基本类型参数，目前支持string,int,double,float,boolean,long基本类型数据
+     *
      * @param value
      * @param name
      * @param parameterTypeClass
+     * @param parameter
      * @return
      */
-    private static Object parseCommonValue(String value, String name, Class<?> parameterTypeClass) {
+    private static Object parseCommonValue(String value, String name, Class<?> parameterTypeClass, Parameter parameter) {
         if (StrUtil.isBlank(value)) {
             return null;
         }
         if (parameterTypeClass.equals(String.class)) {
             return value;
-        } else if (parameterTypeClass.equals(int.class)) {
+        } else if (parameterTypeClass.equals(int.class)
+                || parameterTypeClass.equals(double.class)
+                || parameterTypeClass.equals(float.class)
+                || parameterTypeClass.equals(long.class)
+                || parameterTypeClass.equals(BigDecimal.class)
+                || parameterTypeClass.equals(short.class)) {
             try {
-                return Integer.valueOf(value);
+                if (parameterTypeClass.equals(int.class)) {
+                    return Integer.valueOf(value);
+                } else if (parameterTypeClass.equals(double.class)) {
+                    return Double.valueOf(value);
+                } else if (parameterTypeClass.equals(float.class)) {
+                    return Float.valueOf(value);
+                } else if (parameterTypeClass.equals(long.class)) {
+                    return Long.valueOf(value);
+                } else if (parameterTypeClass.equals(BigDecimal.class)) {
+                    return new BigDecimal(value);
+                } else if (parameterTypeClass.equals(short.class)) {
+                    return Short.valueOf(value);
+                } else {
+                    return null;
+                }
             } catch (NumberFormatException e) {
-                throw new ParameterParseErrorException(value, name, parameterTypeClass);
-            }
-        } else if (parameterTypeClass.equals(double.class)) {
-            try {
-                return Double.valueOf(value);
-            } catch (NumberFormatException e) {
-                throw new ParameterParseErrorException(value, name, parameterTypeClass);
-            }
-        } else if (parameterTypeClass.equals(float.class)) {
-            try {
-                return Float.valueOf(value);
-            } catch (NumberFormatException e) {
-                throw new ParameterParseErrorException(value, name, parameterTypeClass);
+                throw genBindError("Error resolving parameter '" + name + "', unable to match value '"
+                        + value + "' to specified type '" + parameterTypeClass.getName() + "'");
             }
         } else if (parameterTypeClass.equals(boolean.class)) {
             return Boolean.valueOf(value);
-        } else if (parameterTypeClass.equals(long.class)) {
+        } else if (parameterTypeClass.equals(Date.class)) {
+            DateFormat dateFormat = parameter.getAnnotation(DateFormat.class);
+            SimpleDateFormat simpleDateFormat;
+            if (dateFormat != null) {
+                simpleDateFormat = new SimpleDateFormat(dateFormat.value());
+                simpleDateFormat.setTimeZone(TimeZone.getTimeZone(dateFormat.timeZone()));
+            } else {
+                simpleDateFormat = new SimpleDateFormat();
+            }
             try {
-                return Long.valueOf(value);
-            } catch (NumberFormatException e) {
-                throw new ParameterParseErrorException(value, name, parameterTypeClass);
+                return simpleDateFormat.parse(value);
+            } catch (ParseException e) {
+                throw genBindError("Error resolving parameter '" + name + "', unable to match value '"
+                        + value + "' to specified type '" + parameterTypeClass.getName() + "'");
             }
         } else {
             return null;
         }
+    }
+
+    private static ActionException genBindError(String message) {
+        return new ActionException(HttpStatus.BAD_REQUEST.value(),
+                renderManager.getRenderFactory().getErrorRender(HttpStatus.BAD_REQUEST.value()), message);
     }
 
 }

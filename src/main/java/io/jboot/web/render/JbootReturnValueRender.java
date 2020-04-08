@@ -17,10 +17,8 @@ package io.jboot.web.render;
 
 import com.jfinal.core.Action;
 import com.jfinal.kit.JsonKit;
-import com.jfinal.render.FileRender;
-import com.jfinal.render.JsonRender;
-import com.jfinal.render.Render;
-import com.jfinal.render.TextRender;
+import com.jfinal.render.*;
+import io.jboot.web.ResponseEntity;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -42,19 +40,29 @@ public class JbootReturnValueRender extends Render {
     private Render render;
 
     public JbootReturnValueRender(Action action, Object returnValue) {
+
         this.action = action;
-        if (isBaseType(returnValue)) {
+
+        if (returnValue == null) {
+            this.value = null;
+        } else if (isBaseType(returnValue)) {
             this.value = String.valueOf(returnValue);
         } else {
             this.value = returnValue;
         }
 
-        if (this.value instanceof File) {
-            this.render = new FileRender((File) value);
+        if (this.value == null) {
+            this.render = new NullRender();
+        } else if (this.value instanceof ResponseEntity) {
+            this.render = new JbootResponseEntityRender((ResponseEntity) value);
         } else if (this.value instanceof String) {
             this.render = new TextRender((String) value);
         } else if (this.value instanceof Date) {
             this.render = new TextRender(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format((Date) value));
+        } else if (this.value instanceof File) {
+            this.render = new FileRender((File) value);
+        } else if (this.value instanceof Render) {
+            this.render = (Render) value;
         } else {
             this.render = new JsonRender(JsonKit.toJson(value));
         }
@@ -80,9 +88,6 @@ public class JbootReturnValueRender extends Render {
 
 
     private boolean isBaseType(Object value) {
-        if (value == null) {
-            return true;
-        }
         Class c = value.getClass();
         return c == String.class || c == char.class
                 || c == Integer.class || c == int.class

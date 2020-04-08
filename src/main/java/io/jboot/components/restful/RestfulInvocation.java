@@ -8,7 +8,6 @@ public class RestfulInvocation extends Invocation  {
 
     private Action action;
 
-
     public RestfulInvocation(Action action, Controller controller, Object[] args) {
         super(controller, action.getMethod(), action.getInterceptors(), new RestfulCallback(action, controller), args);
         this.action = action;

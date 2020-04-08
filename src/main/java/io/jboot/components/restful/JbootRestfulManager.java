@@ -3,14 +3,16 @@ package io.jboot.components.restful;
 import com.jfinal.aop.Interceptor;
 import com.jfinal.aop.InterceptorManager;
 import com.jfinal.config.Routes;
+import com.jfinal.core.ActionException;
 import com.jfinal.core.Controller;
 import com.jfinal.core.NotAction;
+import com.jfinal.render.RenderManager;
 import io.jboot.components.restful.annotation.DeleteMapping;
 import io.jboot.components.restful.annotation.GetMapping;
 import io.jboot.components.restful.annotation.PostMapping;
 import io.jboot.components.restful.annotation.PutMapping;
-import io.jboot.components.restful.exception.RequestMethodErrorException;
 import io.jboot.utils.StrUtil;
+import io.jboot.web.HttpStatus;
 import io.jboot.web.controller.annotation.RequestMapping;
 
 import java.lang.reflect.Method;
@@ -22,6 +24,7 @@ import java.util.Map;
 public class JbootRestfulManager {
 
     public static class Config {
+
         private boolean mappingSupperClass;
         private String baseViewPath;
         private Interceptor[] routeInterceptors;
@@ -81,7 +84,7 @@ public class JbootRestfulManager {
 
     protected static final String SLASH = "/";
 
-    private RestfulErrorRender restfulErrorRender = new DefaultRestfulErrorRender();
+    private RenderManager renderManager = RenderManager.me();
 
     public static JbootRestfulManager me() {
         return me;
@@ -177,10 +180,8 @@ public class JbootRestfulManager {
                     }
                 }
                 RestfulAction action = new RestfulAction(baseRequestMapping, actionKey, controllerClass,
-                        method, method.getName(), actionInters, route.getFinalViewPath(config.getBaseViewPath()));
+                        method, method.getName(), actionInters, route.getFinalViewPath(config.getBaseViewPath()), requestMethod);
                 String key = requestMethod + ":" + actionKey;
-
-//                RestfulAction restfulAction = new RestfulAction(action, actionKey, requestMethod);
                 if (restfulActions.put(key, action) != null) {
                     //已经存在指定的key
                     throw new RuntimeException(buildMsg(actionKey, controllerClass, method));
@@ -205,34 +206,25 @@ public class JbootRestfulManager {
         //先直接获取
         RestfulAction restfulAction = restfulActions.get(actionKey);
         if (restfulAction == null) {
-            //路径判断
-            String[] paths = actionKey.split(":")[1].replace(requestMethod, "").split(SLASH);
-            for (String _actionKey : restfulActions.keySet()) {
-                String _requestMethod = _actionKey.split(":")[0];
-                String _target = _actionKey.split(":")[1];
-                System.out.println("---------> target:"+target+",_target:"+_target+",_requestMethod:"+_requestMethod+",requestMethod:" + requestMethod);
-                if( target.equals(_target) && !_requestMethod.equals(requestMethod) ){
+            String[] paths = target.split(SLASH);
+            for(Map.Entry<String, RestfulAction> entry : restfulActions.entrySet()){
+                String _requestMethod = entry.getValue().getRequestMethod();
+                String _target = entry.getValue().getActionKey();
+                if (target.equals(_target) && !_requestMethod.equals(requestMethod)) {
                     //请求方法不正确
-                    throw new RequestMethodErrorException(_actionKey, _requestMethod, target, requestMethod);
+                    throw new ActionException(HttpStatus.METHOD_NOT_ALLOWED.value(),
+                            renderManager.getRenderFactory().getErrorRender(HttpStatus.METHOD_NOT_ALLOWED.value()),
+                            "'" + target + "' is specified as a '" + _requestMethod + "' request. '" + requestMethod + "' requests are not supported");
                 }
-                String[] _paths = _actionKey.split(":")[1].replace(requestMethod, "").split(SLASH);
-                if (_actionKey.startsWith(requestMethod) &&
-                        _actionKey.contains("{") && _actionKey.contains("}")
+                String[] _paths = entry.getValue().getActionKey().split(SLASH);
+                if (entry.getValue().getActionKey().startsWith(requestMethod) &&
+                        entry.getValue().getActionKey().contains("{") && entry.getValue().getActionKey().contains("}")
                         && paths.length == _paths.length && RestfulUtils.comparePaths(_paths, paths)) {
-                    restfulAction = restfulActions.get(_actionKey);
+                    restfulAction = entry.getValue();
                     break;
                 }
             }
         }
         return restfulAction;
-    }
-
-    public RestfulErrorRender getRestfulErrorRender() {
-        return restfulErrorRender;
-    }
-
-    public JbootRestfulManager setRestfulErrorRender(RestfulErrorRender restfulErrorRender) {
-        this.restfulErrorRender = restfulErrorRender;
-        return this;
     }
 }

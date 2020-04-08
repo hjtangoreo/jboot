@@ -18,4 +18,11 @@ public class IndexController extends JbootController {
     public void error500(){
 
     }
+
+    public String ping(){
+        return "ping:" + getPara("ping");
+    }
+
+
+
 }

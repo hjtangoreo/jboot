@@ -11,7 +11,9 @@ import java.lang.annotation.*;
  *  float / float[]
  *  boolean / boolean[]
  *  long / long[]
- *
+ *  bigDecimal / bigDecimal[]
+ *  date / date[]
+ *  short / short[]
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)

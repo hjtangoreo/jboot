@@ -81,12 +81,17 @@ public class GatewayHttpProxy {
              */
             configConnection(conn, req);
 
-            conn.connect();
 
-            /**
-             * 复制 post 请求内容到目标服务器
-             */
-            copyRequestStreamToConnection(req, conn);
+            // get 请求
+            if ("get".equalsIgnoreCase(req.getMethod())) {
+                conn.connect();
+            }
+            // post 请求
+            else {
+                conn.setDoOutput(true);
+                conn.setDoInput(true);
+                copyRequestStreamToConnection(req, conn);
+            }
 
 
             /**
@@ -95,7 +100,7 @@ public class GatewayHttpProxy {
             configResponse(resp, conn);
 
             /**
-             * 复制目标流到 Response
+             * 复制目标相应流到 Response
              */
             copyStreamToResponse(conn, resp);
 
@@ -111,19 +116,12 @@ public class GatewayHttpProxy {
         OutputStream outStream = null;
         InputStream inStream = null;
         try {
-
-            // 如果不是 post 请求，不需要复制
-            if ("get".equalsIgnoreCase(req.getMethod())) {
-                return;
-            }
-
-            conn.setDoOutput(true);
             outStream = conn.getOutputStream();
             inStream = req.getInputStream();
-            int n;
+            int len;
             byte[] buffer = new byte[1024];
-            while (-1 != (n = inStream.read(buffer))) {
-                outStream.write(buffer, 0, n);
+            while ((len = inStream.read(buffer)) != -1) {
+                outStream.write(buffer, 0, len);
             }
 
         } finally {
@@ -149,7 +147,6 @@ public class GatewayHttpProxy {
         } finally {
             quetlyClose(inStream, reader);
         }
-
     }
 
 
@@ -174,15 +171,22 @@ public class GatewayHttpProxy {
             Set<String> headerNames = headerFields.keySet();
             for (String headerName : headerNames) {
                 //需要排除 Content-Encoding，因为 Server 可能已经使用 gzip 压缩，但是此代理已经对 gzip 内容进行解压了
-                if (StrUtil.isNotBlank(headerName) && !"Content-Encoding".equalsIgnoreCase(headerName)) {
-                    resp.setHeader(headerName, conn.getHeaderField(headerName));
+                //需要排除 Content-Type，因为会可能会进行多次设置
+                if (StrUtil.isBlank(headerName)
+                        || "Content-Encoding".equalsIgnoreCase(headerName)
+                        || "Content-Type".equalsIgnoreCase(headerName)) {
+                    continue;
+                } else {
+                    String headerFieldValue = conn.getHeaderField(headerName);
+                    if (StrUtil.isNotBlank(headerFieldValue)) {
+                        resp.setHeader(headerName, headerFieldValue);
+                    }
                 }
             }
         }
     }
 
     private static InputStream getInputStream(HttpURLConnection conn) throws IOException {
-
         InputStream stream = conn.getResponseCode() >= 400
                 ? conn.getErrorStream()
                 : conn.getInputStream();
@@ -192,7 +196,6 @@ public class GatewayHttpProxy {
         } else {
             return stream;
         }
-
     }
 
 
@@ -200,16 +203,19 @@ public class GatewayHttpProxy {
 
         conn.setReadTimeout(readTimeOut);
         conn.setConnectTimeout(connectTimeOut);
-        conn.setInstanceFollowRedirects(true);
+        conn.setInstanceFollowRedirects(false);
         conn.setUseCaches(false);
-//        conn.setDefaultUseCaches();
 
         conn.setRequestMethod(req.getMethod());
+
         Enumeration<String> headerNames = req.getHeaderNames();
         while (headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
             if (StrUtil.isNotBlank(headerName)) {
-                conn.setRequestProperty(headerName, req.getHeader(headerName));
+                String headerFieldValue = req.getHeader(headerName);
+                if (StrUtil.isNotBlank(headerFieldValue)) {
+                    conn.setRequestProperty(headerName, headerFieldValue);
+                }
             }
         }
     }
